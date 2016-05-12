@@ -1,5 +1,6 @@
 package cn.com.leador.mapapi.tracker.app.service.impl;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,6 +22,7 @@ import cn.com.leador.mapapi.tracker.component.RedisUtilComponent;
 import cn.com.leador.mapapi.tracker.constants.TrackerConstants;
 import cn.com.leador.mapapi.tracker.exception.TrackerException;
 import cn.com.leador.mapapi.tracker.exception.TrackerExceptionEnum;
+import cn.com.leador.mapapi.tracker.track.bean.TrackColumnBean;
 
 @Service
 public class AppServiceImpl implements AppService {
@@ -88,6 +90,16 @@ public class AppServiceImpl implements AppService {
 			bean.setCreateTime(date);
 			bean.setUpdateTime(date);
 			mongoDBUtilComponent.insertObject("app_info", binder.toJson(bean));
+			// 设置校验服务缓存
+			redisUtilComponent.setRedisStringCache(
+					jedis,
+					TrackerConstants.APP_INFO_PREFIX + bean.getAk()
+							+ bean.getId(), bean.getAk() + bean.getId(), 0);
+			redisUtilComponent.setRedisJsonCache(
+					jedis,
+					TrackerConstants.TRACK_COLUMN_COLLECT_KEY_PREFIX
+							+ bean.getId(), new ArrayList<TrackColumnBean>(),
+					binder, 0);
 			// 释放名称锁
 			redisUtilComponent.releaseIdByRedis(
 					TrackerConstants.APP_NAME_PREFIX,

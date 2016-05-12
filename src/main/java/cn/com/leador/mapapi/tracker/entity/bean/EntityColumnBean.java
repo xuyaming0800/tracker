@@ -2,33 +2,19 @@ package cn.com.leador.mapapi.tracker.entity.bean;
 
 import java.io.Serializable;
 
-public class EntityColumnBean extends EntityAbstractBean implements Serializable {
+import cn.com.leador.mapapi.tracker.bean.TrackerAbstractBean;
+
+public class EntityColumnBean extends TrackerAbstractBean implements Serializable {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -4935480408559211431L;
-	private String ak;
-	private String service_id;
 	private String column_key;
 	private String column_desc;
 	private Integer is_search;
+	private Integer procced_count;
 
-	public String getAk() {
-		return ak;
-	}
-
-	public void setAk(String ak) {
-		this.ak = ak;
-	}
-
-	public String getService_id() {
-		return service_id;
-	}
-
-	public void setService_id(String service_id) {
-		this.service_id = service_id;
-	}
 
 	public String getColumn_key() {
 		return column_key;
@@ -53,5 +39,15 @@ public class EntityColumnBean extends EntityAbstractBean implements Serializable
 	public void setIs_search(Integer is_search) {
 		this.is_search = is_search;
 	}
+
+	public Integer getProcced_count() {
+		return procced_count;
+	}
+
+	public void setProcced_count(Integer procced_count) {
+		this.procced_count = procced_count;
+	}
+	
+	
 
 }

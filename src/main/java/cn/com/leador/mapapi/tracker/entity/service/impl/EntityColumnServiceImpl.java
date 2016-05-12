@@ -19,6 +19,7 @@ import cn.com.leador.mapapi.common.util.json.JsonBinder;
 import cn.com.leador.mapapi.tracker.component.MongoDBUtilComponent;
 import cn.com.leador.mapapi.tracker.component.RedisUtilComponent;
 import cn.com.leador.mapapi.tracker.constants.TrackerConstants;
+import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.IS_SEARCH;
 import cn.com.leador.mapapi.tracker.entity.bean.EntityColumnBean;
 import cn.com.leador.mapapi.tracker.entity.service.EntityColumnService;
 import cn.com.leador.mapapi.tracker.exception.TrackerException;
@@ -45,7 +46,6 @@ public class EntityColumnServiceImpl implements
 	public ResultBean<EntityColumnBean> addColumn(EntityColumnBean bean)
 			throws BusinessException {
 		Jedis jedis = null;
-		boolean isAddIndex = false;
 		ResultBean<EntityColumnBean> result = new ResultBean<EntityColumnBean>();
 		try {
 			jedis = redisUtilComponent.getRedisInstance();
@@ -88,7 +88,8 @@ public class EntityColumnServiceImpl implements
 			queryMap.put("is_search", 1);
 			count = mongoDBUtilComponent.countObject("entity_column_info",
 					queryMap);
-			if (count >= columnIndexMax) {
+			if (bean.getIs_search().equals(IS_SEARCH.YES.getStatus())
+					&& count >= columnIndexMax) {
 				TrackerException ex = new TrackerException(
 						TrackerExceptionEnum.REDIS_ENTITY_COLUMN_INDEX_MAX);
 				throw ex;
@@ -108,11 +109,6 @@ public class EntityColumnServiceImpl implements
 			return result;
 
 		} catch (Exception e) {
-			if (isAddIndex) {
-				Map<String, Object> queryMap = new HashMap<String, Object>();
-				queryMap.put(bean.getColumn_key(), 1);
-				mongoDBUtilComponent.dropIndex("entity_info", queryMap);
-			}
 			if (e instanceof BusinessException) {
 				throw e;
 			}
@@ -140,11 +136,13 @@ public class EntityColumnServiceImpl implements
 			Map<String, Object> queryMap = new HashMap<String, Object>();
 			queryMap.put("service_id", bean.getService_id());
 			queryMap.put("ak", bean.getAk());
-			List<EntityColumnBean> list=mongoDBUtilComponent.selectObjectMultiProjection(
-					"entity_column_info", queryMap, new String[] {
-							"service_id", "column_key", "column_desc",
-							"column_key", "create_time", "modify_time",
-							"is_search" }, false,EntityColumnBean.class,null);
+			List<EntityColumnBean> list = mongoDBUtilComponent
+					.selectObjectMultiProjection("entity_column_info",
+							queryMap,
+							new String[] { "service_id", "column_key",
+									"column_desc", "column_key", "create_time",
+									"modify_time", "is_search" }, false,
+							EntityColumnBean.class, null);
 			ResultBean<List<EntityColumnBean>> result = new ResultBean<List<EntityColumnBean>>();
 			result.setSuccessful(true);
 			result.setResult(list);
@@ -159,6 +157,113 @@ public class EntityColumnServiceImpl implements
 					BusinessExceptionEnum.SYSTEM_ERROR);
 			throw ex;
 		}
+	}
+
+	@Override
+	public ResultBean<EntityColumnBean> deleteColumn(final EntityColumnBean bean)
+			throws BusinessException {
+		Jedis jedis = null;
+		EntityColumnBean oldBean = null;
+		int step = 0;
+		ResultBean<EntityColumnBean> result = new ResultBean<EntityColumnBean>();
+		try {
+			jedis = redisUtilComponent.getRedisInstance();
+			// 判断serviceId是否存在
+			if (!mongoDBUtilComponent.checkAppIsExist(bean.getService_id(),
+					bean.getAk())) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_APP_ID_NOT_FOUND);
+				throw ex;
+			}
+			// 判断名称是否存在
+			Map<String, Object> queryMap = new HashMap<String, Object>();
+			queryMap.put("service_id", bean.getService_id());
+			queryMap.put("column_key", bean.getColumn_key());
+			List<EntityColumnBean> _l = mongoDBUtilComponent
+					.selectObjectMultiProjection("entity_column_info",
+							queryMap, null, false, EntityColumnBean.class, null);
+			if (_l.size() == 0) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_ENTITY_COLUMN_NOT_FOUND);
+				throw ex;
+			}
+
+			oldBean = _l.get(0);
+			if (oldBean.getIs_search().intValue() == IS_SEARCH.YES.getStatus()) {
+				bean.setIs_search(IS_SEARCH.YES.getStatus());
+			} else {
+				bean.setIs_search(IS_SEARCH.NO.getStatus());
+			}
+			// 删除本体
+			mongoDBUtilComponent.removeCommonObject("entity_column_info",
+					queryMap);
+			step = 1;
+			// 记录删除的自定义字段到redis 由job做异步的清理处理
+			bean.setProcced_count(0);
+			redisUtilComponent.appendPush(
+					TrackerConstants.REMOVE_ENTITY_COLUMN_LIST, JsonBinder
+							.buildNonNullBinder(false).toJson(bean), jedis);
+			// 删除引用
+			this.cascadeDeleteColumn(bean);
+			step = 2;
+			result.setSuccessful(true);
+			result.setResult(bean);
+			return result;
+
+		} catch (Exception e) {
+			if (e instanceof BusinessException) {
+				throw e;
+			}
+			logger.error(e.getMessage(), e);
+			BusinessException ex = new BusinessException(
+					BusinessExceptionEnum.SYSTEM_ERROR);
+			throw ex;
+		} finally {
+			if (step == 1) {
+				// 回滚数据
+				mongoDBUtilComponent.insertObject("entity_column_info",
+						JsonBinder.buildNonNullBinder(false).toJson(oldBean));
+			}
+			redisUtilComponent.returnRedis(jedis);
+		}
+	}
+
+	@SuppressWarnings("serial")
+	@Override
+	public void cascadeDeleteColumn(
+			final EntityColumnBean bean) throws BusinessException {
+		String indexFieldName = "";
+		if (bean.getIs_search().intValue() == IS_SEARCH.YES.getStatus()) {
+			indexFieldName = "custom_field_index";
+		} else {
+			indexFieldName = "custom_field_common";
+		}
+		final String name = indexFieldName;
+		Map<String, Object> queryMap = new HashMap<String, Object>();
+		queryMap.put("service_id", bean.getService_id());
+		queryMap.put(name + "." + bean.getColumn_key(),
+				new HashMap<String, Object>() {
+					{
+						put("$exists", true);
+					}
+				});
+		Map<String, Object> updateMap = new HashMap<String, Object>();
+		updateMap.put("$pull", new HashMap<String, Object>() {
+			{
+				put(name, new HashMap<String, Object>() {
+					{
+						put(bean.getColumn_key(),
+								new HashMap<String, Object>() {
+									{
+										put("$exists", true);
+									}
+								});
+					}
+				});
+			}
+		});
+		mongoDBUtilComponent.executeUpdate("entity_info", queryMap,
+				updateMap);
 	}
 
 }

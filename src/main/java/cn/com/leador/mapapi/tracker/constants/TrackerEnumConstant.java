@@ -39,10 +39,49 @@ public class TrackerEnumConstant {
 			this.status = status;
 		}
 	}
+	
+	public enum TRACK_RETURN_TYPE{
+		FULL(0),SIMPLE(1);
+		private int status;
+
+		public int getStatus() {
+			return status;
+		}
+
+		private TRACK_RETURN_TYPE(int status) {
+			this.status = status;
+		}
+	}
+	
+	public enum TRACK_COLUMN_TYPE{
+		INT64(1),DOUBLE(2),STRING(3);
+		private int status;
+
+		public int getStatus() {
+			return status;
+		}
+
+		private TRACK_COLUMN_TYPE(int status) {
+			this.status = status;
+		}
+	}
+	
+	public enum TRACK_GPS_TYPE{
+		GPS(1),GCJ02(2),BAIDU(3);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private TRACK_GPS_TYPE(int type) {
+			this.type = type;
+		}
+	}
 
 	public enum TRACKER_SERVICE_TYPE {
 		// CAR 车辆管理行业 MTK MTK位置穿戴 O2O O2O配送行业 OTHER 其他
-		CAR("CAR"), MTK("v2"), O2O("O2O"), OTHER("OTHER");
+		CAR("CAR"), MTK("MTK"), O2O("O2O"), OTHER("OTHER");
 		private String code;
 
 		public String getCode() {
@@ -51,6 +90,31 @@ public class TrackerEnumConstant {
 
 		private TRACKER_SERVICE_TYPE(String code) {
 			this.code = code;
+		}
+	}
+	public enum IS_PROCESSED {
+		YES(1),NO(0);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private IS_PROCESSED(int type) {
+			this.type = type;
+		}
+	}
+	
+	public enum TRACK_TIME_SORT_TYPE {
+		ascending(1),descending(0);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private TRACK_TIME_SORT_TYPE(int type) {
+			this.type = type;
 		}
 	}
 	

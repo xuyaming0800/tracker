@@ -4,14 +4,14 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-public class EntityBean extends EntityAbstractBean implements Serializable {
+import cn.com.leador.mapapi.tracker.bean.TrackerAbstractBean;
+
+public class EntityBean extends TrackerAbstractBean implements Serializable {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 9092364581087576728L;
-	private String ak;
-	private String service_id;
 	private String entity_name;
 	private Map<String, Object> custom_field;
 	private List<Map<String, Object>> custom_field_index;
@@ -65,21 +65,6 @@ public class EntityBean extends EntityAbstractBean implements Serializable {
 		this.page_size = page_size;
 	}
 
-	public String getAk() {
-		return ak;
-	}
-
-	public void setAk(String ak) {
-		this.ak = ak;
-	}
-
-	public String getService_id() {
-		return service_id;
-	}
-
-	public void setService_id(String service_id) {
-		this.service_id = service_id;
-	}
 
 	public String getEntity_name() {
 		return entity_name;

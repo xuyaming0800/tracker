@@ -18,5 +18,18 @@ public interface EntityColumnService<T,S> {
 	 * @return
 	 */
 	public ResultBean<List<T>> listColumn(S bean)throws BusinessException;
+	/**
+	 * 删除自定义字段
+	 * @param bean
+	 * @return
+	 * @throws BusinessException
+	 */
+	public ResultBean<T> deleteColumn(S bean) throws BusinessException;
+	/**
+	 * 级联删除自定义字段关联数据
+	 * @param bean
+	 * @throws BusinessException
+	 */
+	public void cascadeDeleteColumn(S bean) throws BusinessException;
 
 }

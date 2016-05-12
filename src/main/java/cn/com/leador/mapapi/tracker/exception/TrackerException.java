@@ -16,5 +16,8 @@ public class TrackerException extends BusinessException {
 	public TrackerException(TrackerExceptionEnum enums) {
 		super(enums.getCode(),enums.getMessage());
 	}
+	public TrackerException(TrackerExceptionEnum enums,String extraMessage){
+		super(enums.getCode(),enums.getMessage()+"["+extraMessage+"]");
+	}
 
 }

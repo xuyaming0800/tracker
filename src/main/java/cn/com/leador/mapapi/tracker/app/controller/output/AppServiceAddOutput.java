@@ -23,6 +23,7 @@ public class AppServiceAddOutput extends DefaultOutput<AppServiceBean> {
 			Map<String,Object> map=new HashMap<String,Object>();
 			map.put("status", "0");
 			map.put("message", "成功");
+			map.put("service_id", t.getId());
 			return writeToOutput(map, clientInfo, "app");
 		} catch (Exception e) {
 			BusinessException exception=new BusinessException(BusinessExceptionEnum.OUTPUT_TRANSFORM_ERROR,e);

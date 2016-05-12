@@ -2,6 +2,7 @@ package cn.com.leador.mapapi.tracker.component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import cn.com.leador.mapapi.tracker.exception.TrackerException;
 import cn.com.leador.mapapi.tracker.exception.TrackerExceptionEnum;
 
 import com.fasterxml.jackson.databind.JavaType;
+import com.mongodb.AggregationOutput;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
@@ -45,6 +47,47 @@ public class MongoDBUtilComponent {
 		private JSON_STYLE(int code) {
 			this.code = code;
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public void insertObjects(String tableName, List<String> jsons)
+			throws BusinessException {
+		if (jsons != null) {
+			try {
+				DBCollection dbcoll = mongoTemplate.getDb().getCollection(
+						tableName);
+				List<BasicDBObject> inserList=new ArrayList<BasicDBObject>();
+				for (String json : jsons) {
+					Integer style = this.verifyJsonStyle(json);
+					JsonBinder binder = JsonBinder.buildNormalBinder(false);
+					Map<String, Object> insertMap = null;
+					if (style.equals(JSON_STYLE.MAP.getCode())) {
+						insertMap = binder.fromJson(json, Map.class, binder
+								.getCollectionType(Map.class, String.class,
+										Object.class));
+					} else if (style.equals(JSON_STYLE.ARRAY.getCode())) {
+						logger.error("插入时候的JSON串必须是JSON格式");
+						throw new TrackerException(
+								TrackerExceptionEnum.MONGONDB_INSERT_ERROR);
+					}
+					
+					BasicDBObject insert = new BasicDBObject();
+					if (insertMap != null)
+						insert.putAll(insertMap);
+					inserList.add(insert);
+					// 记录日志 供万一写数据失败 追回使用
+					logger.info("[INSERT] " + json);
+				}
+				dbcoll.insert(inserList);
+			} catch (Exception e) {
+				logger.error(e.getMessage(), e);
+				throw new TrackerException(
+						TrackerExceptionEnum.MONGONDB_INSERT_ERROR);
+
+			}
+
+		}
+
 	}
 
 	/**
@@ -142,7 +185,14 @@ public class MongoDBUtilComponent {
 				}
 				dBCursor = dbcoll.find(query, projection);
 			} else {
-				dBCursor = dbcoll.find(query);
+				if (!isReturnId) {
+					BasicDBObject projection = new BasicDBObject();
+					projection.put("_id", 0);
+					dBCursor = dbcoll.find(query,projection);
+				}else{
+					dBCursor = dbcoll.find(query);
+				}
+				
 			}
 			for (DBObject _obj : dBCursor) {
 				if (_obj.toMap().size() > 0)
@@ -156,22 +206,26 @@ public class MongoDBUtilComponent {
 
 		}
 	}
+
 	/**
 	 * 泛型的分页查询
+	 * 
 	 * @param tableName
 	 * @param selectQueryMap
 	 * @param selectlocates
 	 * @param isReturnId
 	 * @param clazz
 	 * @param javaType
-	 * @param pageIndex from 1
+	 * @param pageIndex
+	 *            from 1
 	 * @param pageSize
 	 * @return
 	 * @throws BusinessException
 	 */
 	public <T> List<T> selectObjectMultiProjection(String tableName,
 			Map<String, Object> selectQueryMap, String[] selectlocates,
-			boolean isReturnId,Class<T> clazz,JavaType javaType,Integer pageIndex,Integer pageSize) throws BusinessException {
+			boolean isReturnId, Class<T> clazz, JavaType javaType,
+			Integer pageIndex, Integer pageSize) throws BusinessException {
 		try {
 			JsonBinder binder = JsonBinder.buildNonNullBinder(false);
 			DBCollection dbcoll = mongoTemplate.getDb()
@@ -188,21 +242,30 @@ public class MongoDBUtilComponent {
 				if (!isReturnId) {
 					projection.put("_id", 0);
 				}
-				dBCursor = dbcoll.find(query, projection).skip((pageIndex-1)*pageSize).limit(pageSize);
+				dBCursor = dbcoll.find(query, projection)
+						.skip((pageIndex - 1) * pageSize).limit(pageSize);
 			} else {
-				dBCursor = dbcoll.find(query).skip((pageIndex-1)*pageSize).limit(pageSize);;
+				if (!isReturnId) {
+					BasicDBObject projection = new BasicDBObject();
+					projection.put("_id", 0);
+					dBCursor = dbcoll.find(query,projection).skip((pageIndex - 1) * pageSize)
+							.limit(pageSize);
+				}else{
+					dBCursor = dbcoll.find(query).skip((pageIndex - 1) * pageSize)
+							.limit(pageSize);
+				}
 			}
 			for (DBObject _obj : dBCursor) {
-				if (_obj.toMap().size() > 0){
-					T t=null;
-					if(javaType!=null){
-						t=binder.fromJson(_obj.toString(), clazz, javaType);
-					}else{
-						t=binder.fromJson(_obj.toString(), clazz);
+				if (_obj.toMap().size() > 0) {
+					T t = null;
+					if (javaType != null) {
+						t = binder.fromJson(_obj.toString(), clazz, javaType);
+					} else {
+						t = binder.fromJson(_obj.toString(), clazz);
 					}
 					result.add(t);
 				}
-					
+
 			}
 			return result;
 		} catch (Exception e) {
@@ -212,8 +275,67 @@ public class MongoDBUtilComponent {
 
 		}
 	}
+	
+	public <T> List<T> selectObjectMultiProjection(String tableName,
+			Map<String, Object> selectQueryMap, String[] selectlocates,
+			boolean isReturnId, Class<T> clazz, JavaType javaType,
+			Integer pageIndex, Integer pageSize,Map<String,Object> sort) throws BusinessException {
+		try {
+			JsonBinder binder = JsonBinder.buildNonNullBinder(false);
+			DBCollection dbcoll = mongoTemplate.getDb()
+					.getCollection(tableName);
+			BasicDBObject query = new BasicDBObject();
+			BasicDBObject sortMap = new BasicDBObject();
+			sortMap.putAll(sort);
+			query.putAll(selectQueryMap);
+			DBCursor dBCursor = null;
+			List<T> result = new ArrayList<T>();
+			if (selectlocates != null && selectlocates.length > 0) {
+				BasicDBObject projection = new BasicDBObject();
+				for (String selectlocate : selectlocates) {
+					projection.put(selectlocate, 1);
+				}
+				if (!isReturnId) {
+					projection.put("_id", 0);
+				}
+				dBCursor = dbcoll.find(query, projection).sort(sortMap)
+						.skip((pageIndex - 1) * pageSize).limit(pageSize);
+			} else {
+				if (!isReturnId) {
+					BasicDBObject projection = new BasicDBObject();
+					projection.put("_id", 0);
+					dBCursor = dbcoll.find(query,projection).sort(sortMap).skip((pageIndex - 1) * pageSize)
+							.limit(pageSize);
+				}else{
+					dBCursor = dbcoll.find(query).sort(sortMap).skip((pageIndex - 1) * pageSize)
+							.limit(pageSize);
+				}
+				
+			}
+			for (DBObject _obj : dBCursor) {
+				if (_obj.toMap().size() > 0) {
+					T t = null;
+					if (javaType != null) {
+						t = binder.fromJson(_obj.toString(), clazz, javaType);
+					} else {
+						t = binder.fromJson(_obj.toString(), clazz);
+					}
+					result.add(t);
+				}
+
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error(e.getMessage(), e);
+			throw new TrackerException(
+					TrackerExceptionEnum.MONGONDB_QUERY_ERROR);
+
+		}
+	}
+
 	/**
 	 * 泛型的查询方法
+	 * 
 	 * @param tableName
 	 * @param selectQueryMap
 	 * @param selectlocates
@@ -225,7 +347,8 @@ public class MongoDBUtilComponent {
 	 */
 	public <T> List<T> selectObjectMultiProjection(String tableName,
 			Map<String, Object> selectQueryMap, String[] selectlocates,
-			boolean isReturnId,Class<T> clazz,JavaType javaType) throws BusinessException {
+			boolean isReturnId, Class<T> clazz, JavaType javaType)
+			throws BusinessException {
 		try {
 			JsonBinder binder = JsonBinder.buildNonNullBinder(false);
 			DBCollection dbcoll = mongoTemplate.getDb()
@@ -244,19 +367,25 @@ public class MongoDBUtilComponent {
 				}
 				dBCursor = dbcoll.find(query, projection);
 			} else {
-				dBCursor = dbcoll.find(query);
+				if (!isReturnId) {
+					BasicDBObject projection = new BasicDBObject();
+					projection.put("_id", 0);
+					dBCursor = dbcoll.find(query,projection);
+				}else{
+					dBCursor = dbcoll.find(query);
+				}
 			}
 			for (DBObject _obj : dBCursor) {
-				if (_obj.toMap().size() > 0){
-					T t=null;
-					if(javaType!=null){
-						t=binder.fromJson(_obj.toString(), clazz, javaType);
-					}else{
-						t=binder.fromJson(_obj.toString(), clazz);
+				if (_obj.toMap().size() > 0) {
+					T t = null;
+					if (javaType != null) {
+						t = binder.fromJson(_obj.toString(), clazz, javaType);
+					} else {
+						t = binder.fromJson(_obj.toString(), clazz);
 					}
 					result.add(t);
 				}
-					
+
 			}
 			return result;
 		} catch (Exception e) {
@@ -293,6 +422,7 @@ public class MongoDBUtilComponent {
 		}
 
 	}
+
 	public void dropIndex(String tableName, Map<String, Object> indexMap)
 			throws BusinessException {
 		try {
@@ -337,6 +467,39 @@ public class MongoDBUtilComponent {
 
 		}
 	}
+	
+	public <T> List<T> aggregateObject(String tableName,List<Map<String,Object>> list,Class<T> clazz, JavaType javaType,JsonBinder binder)throws BusinessException{
+		try {
+			DBCollection dbcoll = mongoTemplate.getDb()
+					.getCollection(tableName);
+			List<BasicDBObject> pipeline = new LinkedList<BasicDBObject>();
+			for(Map<String,Object> _map:list){
+				BasicDBObject query=new BasicDBObject();
+				query.putAll(_map);
+				pipeline.add(query);
+			}
+			List<T> result = new ArrayList<T>();
+			AggregationOutput outPut = dbcoll.aggregate(pipeline);
+			for(DBObject obj:outPut.results()){
+				if (obj.toMap().size() > 0) {
+					T t=null;
+					if (javaType != null) {
+						t = binder.fromJson(obj.toString(), clazz, javaType);
+					} else {
+						t = binder.fromJson(obj.toString(), clazz);
+					}
+					result.add(t);
+				}
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error(e.getMessage(), e);
+			throw new TrackerException(
+					TrackerExceptionEnum.MONGONDB_QUERY_ERROR);
+
+		}
+	}
+	
 
 	/**
 	 * 查询mongodb
@@ -366,7 +529,13 @@ public class MongoDBUtilComponent {
 				}
 				dBCursor = dbcoll.find(query, projection);
 			} else {
-				dBCursor = dbcoll.find(query);
+				if (!isReturnId) {
+					BasicDBObject projection = new BasicDBObject();
+					projection.put("_id", 0);
+					dBCursor = dbcoll.find(query,projection);
+				}else{
+					dBCursor = dbcoll.find(query);
+				}
 			}
 			for (DBObject _obj : dBCursor) {
 				if (_obj.toMap().size() > 0)
@@ -497,6 +666,37 @@ public class MongoDBUtilComponent {
 					TrackerExceptionEnum.MONGONDB_UPDATE_ERROR);
 		}
 
+	}
+	
+	public void executeUpdate(String tableName,
+			Map<String, Object> updateQueryMap, Map<String, Object> updateMap)
+			throws BusinessException {
+		try {
+			DBCollection dbcoll = mongoTemplate.getDb()
+					.getCollection(tableName);
+			BasicDBObject updateQuery = new BasicDBObject();
+			updateQuery.putAll(updateQueryMap);
+			BasicDBObject update = new BasicDBObject();
+
+			// JSON形式 直接set
+			update.putAll(updateMap);
+			dbcoll.update(updateQuery, update);
+
+			// 记录日志 供万一写数据失败 追回使用
+			for (String key : updateMap.keySet()) {
+				String updatejson = "";
+				JsonBinder binder = JsonBinder.buildNormalBinder(false);
+				updatejson = binder.toJson(updateMap.get(key));
+				String queryJson = binder.toJson(updateQueryMap);
+				logger.info("[UPDATE_QUERY] " + queryJson + " [UPDATE_LOCATE] "
+						+ key + " [UPDATE] " + updatejson);
+			}
+
+		} catch (Exception e) {
+			logger.error(e.getMessage(), e);
+			throw new TrackerException(
+					TrackerExceptionEnum.MONGONDB_UPDATE_ERROR);
+		}
 	}
 
 	public void batchUpdateCommonObject(String tableName,
@@ -633,9 +833,9 @@ public class MongoDBUtilComponent {
 		}
 
 	}
-	
-	public Boolean checkAppIsExist(String serviceId,String ak) {
-		Map<String,Object> query=new HashMap<String,Object>();
+
+	public Boolean checkAppIsExist(String serviceId, String ak) {
+		Map<String, Object> query = new HashMap<String, Object>();
 		query.put("ak", ak);
 		query.put("id", serviceId);
 		return this.checkObjectIsExist("app_info", query);
@@ -666,7 +866,7 @@ public class MongoDBUtilComponent {
 		}
 
 	}
-	
+
 	/**
 	 * 
 	 * @param tableName

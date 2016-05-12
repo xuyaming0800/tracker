@@ -1,6 +1,8 @@
 package cn.com.leador.mapapi.tracker.entity.bean;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 public class EntityLocationBean implements Serializable {
 	/**
@@ -10,7 +12,8 @@ public class EntityLocationBean implements Serializable {
 	private Long loc_time=0L;
 	private Double[] location=new Double[]{0.0D,0.0D};
 	private Double speed=0.0D;
-	private Double direction=0.0D;
+	private Integer direction=0;
+	private Map<String,Object> trackColumns=new HashMap<String,Object>();
 	public Long getLoc_time() {
 		return loc_time;
 	}
@@ -29,11 +32,17 @@ public class EntityLocationBean implements Serializable {
 	public void setSpeed(Double speed) {
 		this.speed = speed;
 	}
-	public Double getDirection() {
+	public Integer getDirection() {
 		return direction;
 	}
-	public void setDirection(Double direction) {
+	public void setDirection(Integer direction) {
 		this.direction = direction;
+	}
+	public Map<String, Object> getTrackColumns() {
+		return trackColumns;
+	}
+	public void setTrackColumns(Map<String, Object> trackColumns) {
+		this.trackColumns = trackColumns;
 	}
 	
 

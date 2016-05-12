@@ -21,6 +21,16 @@ public enum TrackerExceptionEnum {
 	REDIS_ENTITY_NAME_DUP("t_1015","实体名称已经存在"),
 	REDIS_ENTITY_MAX("t_1016","实体达到最大数目"),
 	REDIS_ENTITY_COLUMN_INDEX_NOT_FOUND("t_1017","自定义检索字段不存在或者非索引字段"),
+	REDIS_TRACK_COLUMN_DUP("t_1018","轨迹字段已经存在"),
+	REDIS_TRACK_COLUMN_MAX("t_1019","轨迹字段达到最大数目"),
+	
+	REDIS_TRACK_COLUMN_NOT_FOUND("t_1020","轨迹自定义字段未找到"),
+	REDIS_TRACK_COLUMN_TYPE_ERROR("t_1021","轨迹自定义字段类型错误"),
+	
+	MQ_RECEIVE_ERROR("t_1022","处理轨迹消息队列错误"),
+	LOC_OVER_TIME_ERROR("t_1023","loc_time超过服务端时间10分钟"),
+	REDIS_ENTITY_COLUMN_NOT_FOUND("t_1024","自定义检索字段不存在"),
+	REDIS_ENTITY_NAME_NOT_FOUND("t_1025","实体名称不存在"),
 	
 	;
 	private String code;

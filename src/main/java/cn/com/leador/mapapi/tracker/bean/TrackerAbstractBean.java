@@ -1,15 +1,35 @@
-package cn.com.leador.mapapi.tracker.entity.bean;
+package cn.com.leador.mapapi.tracker.bean;
 
 import java.util.Date;
 
 import cn.com.leador.mapapi.tracker.util.DateUtil;
 
 
-public abstract class EntityAbstractBean {
+public abstract class TrackerAbstractBean {
+	private String ak;
+	private String service_id;
 	private String create_time;
 	private Long create_timestamp;
 	private String modify_time;
 	private Long modify_timestamp;
+	
+	
+
+	public String getAk() {
+		return ak;
+	}
+
+	public void setAk(String ak) {
+		this.ak = ak;
+	}
+
+	public String getService_id() {
+		return service_id;
+	}
+
+	public void setService_id(String service_id) {
+		this.service_id = service_id;
+	}
 
 	public String getCreate_time() {
 		return create_time;

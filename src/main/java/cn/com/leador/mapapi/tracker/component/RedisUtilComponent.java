@@ -12,6 +12,8 @@ import cn.com.leador.mapapi.common.exception.BusinessException;
 import cn.com.leador.mapapi.common.util.json.JsonBinder;
 import cn.com.leador.mapapi.tracker.exception.TrackerException;
 import cn.com.leador.mapapi.tracker.exception.TrackerExceptionEnum;
+
+import com.fasterxml.jackson.databind.JavaType;
 @Component
 public class RedisUtilComponent {
 	private Logger logger = LogManager.getLogger(this.getClass());
@@ -209,6 +211,27 @@ public class RedisUtilComponent {
 			}
 		}
 	}
+	
+	public <T> T getRedisJsonCache(Jedis jedis,String key,Class<T> clazz,JsonBinder binder,JavaType javaType)throws BusinessException{
+		if(jedis==null){
+    		throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+    	}
+		try {
+			String value=jedis.get(key);
+			if(value!=null){
+				return binder.fromJson(jedis.get(key), clazz,javaType);
+			}
+			return null;
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}
+	}
+	
 	public <T> T getRedisJsonCache(String key,Class<T> clazz,JsonBinder binder)throws BusinessException{
 		Jedis jedis=null;
 		try {
@@ -313,6 +336,117 @@ public class RedisUtilComponent {
 			}
 			logger.info("key=["+key+"]将锁定"+expire+"秒");
 			jedis.expire(key, expire);
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}finally{
+			this.returnRedis(jedis);
+		}
+	}
+	/**
+	 * 往LIST队尾插入值
+	 * @param key
+	 * @param value
+	 * @param jedis
+	 * @throws BusinessException
+	 */
+	public void appendPush(String key, String value,Jedis jedis) throws BusinessException {
+		if(jedis==null){
+    		throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+    	}
+		try {
+			jedis.rpush(key, value);
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}
+	}
+	public void appendPush(String key, String value) throws BusinessException {
+		Jedis jedis=null;
+		try {
+			jedis=this.getRedisInstance();
+			jedis.rpush(key, value);
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}finally{
+			this.returnRedis(jedis);
+		}
+	}
+	/**
+	 * 从LIST对头取得并弹出值
+	 * @param key
+	 * @param jedis
+	 * @return
+	 * @throws BusinessException
+	 */
+	public String prependPop(String key, Jedis jedis) throws BusinessException {
+		if(jedis==null){
+    		throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+    	}
+		try {
+			String value=jedis.lpop(key);
+			return value;
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}
+	}
+	public String prependPop(String key) throws BusinessException {
+		Jedis jedis=null;
+		try {
+			jedis=this.getRedisInstance();
+			String value=jedis.lpop(key);
+			return value;
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}finally{
+			this.returnRedis(jedis);
+		}
+	}
+	public Long getListSize(String key, Jedis jedis) throws BusinessException {
+		if(jedis==null){
+    		throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+    	}
+		try {
+			Long value=jedis.llen(key);
+			return value;
+		} catch (Exception e) {
+			if(e instanceof BusinessException){
+				throw (BusinessException)e;
+			}else{
+				logger.error(e.getMessage(),e);
+				throw new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+			}
+		}
+	}
+	public Long getListSize(String key) throws BusinessException {
+		Jedis jedis=null;
+		try {
+			jedis=this.getRedisInstance();
+			Long value=jedis.llen(key);
+			return value;
 		} catch (Exception e) {
 			if(e instanceof BusinessException){
 				throw (BusinessException)e;

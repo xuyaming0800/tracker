@@ -139,11 +139,13 @@ public class EntityListInput extends CommonInputProxy<List<EntityBean>> {
 			map.put("page_size", "20");
 			clientInfo.getOrginParamNames().add("page_size");
 		} else {
-			if (!this.checkParamIsNumber(pageSize, Integer.class)) {
+			int num = 0;
+			try {
+				num=Integer.parseInt(pageSize);
+			} catch (NumberFormatException e) {
 				bean.appnedMessage("page_size 不是整数");
 				return bean;
 			}
-			int num = Integer.parseInt(pageSize);
 			if (num < 1 || num > 100) {
 				bean.appnedMessage("page_size 最小值是1;最大值是100");
 				return bean;

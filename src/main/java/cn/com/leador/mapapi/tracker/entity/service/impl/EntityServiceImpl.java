@@ -121,6 +121,8 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 			bean.setModify_time(date);
 			EntityLocationBean realPoint = new EntityLocationBean();
 			realPoint.setLoc_time(date.getTime() / 1000);
+			realPoint.setSpeed(null);
+			realPoint.setDirection(null);
 			bean.setRealtime_point(realPoint);
 			Map<String, Object> _temp = bean.getCustom_field();
 			bean.setCustom_field(null);
@@ -159,6 +161,7 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 						TrackerExceptionEnum.REDIS_APP_ID_NOT_FOUND);
 				throw ex;
 			}
+
 			// 检测自定义索引列表
 			Map<String, Object> queryMap = new HashMap<String, Object>();
 			queryMap.put("service_id", bean.getService_id());
@@ -211,8 +214,7 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 			if (bean.getRealtime_point() != null
 					&& bean.getRealtime_point().getLoc_time() > 0) {
 				Map<String, Object> _map = new HashMap<String, Object>();
-				_map.put("$gte", bean.getRealtime_point()
-						.getLoc_time());
+				_map.put("$gte", bean.getRealtime_point().getLoc_time());
 				queryMap.put("realtime_point.loc_time", _map);
 			}
 			// 实体名称条件
@@ -224,7 +226,8 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 					queryMap);
 			// 查询结果
 			String[] projection = new String[] { "realtime_point",
-					"entity_name", "create_time", "modify_time","custom_field_index","custom_field_common" };
+					"entity_name", "create_time", "modify_time",
+					"custom_field_index", "custom_field_common" };
 			if (bean.getReturn_type().intValue() == ENTITY_RETURN_TYPE.SIMPLE
 					.getStatus()) {
 				projection = new String[] { "entity_name" };
@@ -248,6 +251,163 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 					BusinessExceptionEnum.SYSTEM_ERROR);
 			throw ex;
 		}
+	}
+
+	@Override
+	public ResultBean<EntityBean> deleteEntity(EntityBean bean)
+			throws BusinessException {
+		ResultBean<EntityBean> result = new ResultBean<EntityBean>();
+		int step = 0;
+		EntityBean oldBean = null;
+		try {
+			// 判断serviceId是否存在
+			if (!mongoDBUtilComponent.checkAppIsExist(bean.getService_id(),
+					bean.getAk())) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_APP_ID_NOT_FOUND);
+				throw ex;
+			}
+			// 判断entity_name是否存在并获取实体
+			Map<String, Object> queryMap = new HashMap<String, Object>();
+			queryMap.put("service_id", bean.getService_id());
+			queryMap.put("entity_name", bean.getEntity_name());
+			List<EntityBean> _l = mongoDBUtilComponent
+					.selectObjectMultiProjection("entity_info", queryMap, null,
+							false, EntityBean.class, null);
+			if (_l.size() == 0) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_ENTITY_NAME_NOT_FOUND);
+				throw ex;
+			}
+			oldBean = _l.get(0);
+			// 删除本体 物理删除
+			mongoDBUtilComponent.removeCommonObject("entity_info", queryMap);
+			step = 1;
+			// 缓存删除实体 用来处理垃圾数据  百度鹰眼的模式为不添加实体会在记录轨迹的时候自动记录 此功能暂时不开放
+//			redisUtilComponent.appendPush(
+//					TrackerConstants.REMOVE_ENTITY_LIST, JsonBinder
+//							.buildNonNullBinder(false).toJson(bean));
+			// 级联删除tracker 物理删除
+			this.cascadeDeleteEntity(bean);
+			step = 2;
+			result.setSuccessful(true);
+			result.setResult(bean);
+			return result;
+
+		} catch (Exception e) {
+			if (e instanceof BusinessException) {
+				throw e;
+			}
+			logger.error(e.getMessage(), e);
+			BusinessException ex = new BusinessException(
+					BusinessExceptionEnum.SYSTEM_ERROR);
+			throw ex;
+		} finally {
+			if (step == 1) {
+				// 回滚数据
+				mongoDBUtilComponent.insertObject("entity_info", JsonBinder
+						.buildNonNullBinder(false).toJson(oldBean));
+			}
+		}
+	}
+
+	@SuppressWarnings("serial")
+	@Override
+	public ResultBean<EntityBean> updateEntity(final EntityBean bean)
+			throws BusinessException {
+		ResultBean<EntityBean> result = new ResultBean<EntityBean>();
+		try {
+			// 判断serviceId是否存在
+			if (!mongoDBUtilComponent.checkAppIsExist(bean.getService_id(),
+					bean.getAk())) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_APP_ID_NOT_FOUND);
+				throw ex;
+			}
+			// 判断entity_name是否存在并获取实体
+			Map<String, Object> queryMap = new HashMap<String, Object>();
+			queryMap.put("service_id", bean.getService_id());
+			queryMap.put("entity_name", bean.getEntity_name());
+			boolean check = mongoDBUtilComponent.checkObjectIsExist(
+					"entity_info", queryMap);
+			if (!check) {
+				TrackerException ex = new TrackerException(
+						TrackerExceptionEnum.REDIS_ENTITY_NAME_NOT_FOUND);
+				throw ex;
+			}
+			// 查找自定义字段
+			queryMap.clear();
+			queryMap.put("service_id", bean.getService_id());
+			List<EntityColumnBean> list = mongoDBUtilComponent
+					.selectObjectMultiProjection("entity_column_info",
+							queryMap,
+							new String[] { "column_key", "is_search" }, false,
+							EntityColumnBean.class, null);
+			Map<String, Integer> columnMap = new HashMap<String, Integer>();
+			for (EntityColumnBean _bean : list) {
+				columnMap.put(_bean.getColumn_key(), _bean.getIs_search());
+			}
+			List<Map<String, Object>> listIndex = new ArrayList<Map<String, Object>>();
+			List<Map<String, Object>> listCommon = new ArrayList<Map<String, Object>>();
+			// 判定字段是否可用和分段处理字段
+			for (String key : bean.getCustom_field().keySet()) {
+				if (columnMap.containsKey(key)) {
+					Map<String, Object> _map = new HashMap<String, Object>();
+					_map.put(key, bean.getCustom_field().get(key));
+					if (columnMap.get(key).intValue() == IS_SEARCH.YES
+							.getStatus()) {
+						listIndex.add(_map);
+					} else {
+						listCommon.add(_map);
+					}
+				} else {
+					// 找不到情况 百度没处理 暂时不处理
+				}
+			}
+			bean.setCustom_field_index(listIndex);
+			bean.setCustom_field_common(listCommon);
+
+			// 更新实体的更新时间和自定义字段
+			queryMap.clear();
+			queryMap.put("service_id", bean.getService_id());
+			queryMap.put("entity_name", bean.getEntity_name());
+			Date date = new Date();
+			bean.setCreate_time(date);
+			bean.setModify_time(date);
+			Map<String, Object> updateMap = new HashMap<String, Object>();
+			updateMap.put("$set", new HashMap<String, Object>() {
+				{
+					put("modify_time", bean.getModify_time());
+					put("modify_timestamp", bean.getModify_timestamp());
+					put("custom_field_index", bean.getCustom_field_index());
+					put("custom_field_common",bean.getCustom_field_common());
+				}
+			});
+			mongoDBUtilComponent.executeUpdate("entity_info", queryMap,
+					updateMap);
+			result.setSuccessful(true);
+			result.setResult(bean);
+			return result;
+
+		} catch (Exception e) {
+			if (e instanceof BusinessException) {
+				throw e;
+			}
+			logger.error(e.getMessage(), e);
+			BusinessException ex = new BusinessException(
+					BusinessExceptionEnum.SYSTEM_ERROR);
+			throw ex;
+		} finally {
+
+		}
+	}
+
+	@Override
+	public void cascadeDeleteEntity(EntityBean bean) throws BusinessException {
+		Map<String, Object> queryMap = new HashMap<String, Object>();
+		queryMap.put("service_id", bean.getService_id());
+		queryMap.put("entity_name", bean.getEntity_name());
+		mongoDBUtilComponent.removeCommonObject("track_info", queryMap);
 	}
 
 }
