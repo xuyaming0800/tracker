@@ -1,8 +1,6 @@
 package cn.com.leador.mapapi.tracker.test;
 
-import cn.com.leador.mapapi.common.exception.BusinessException;
-import cn.com.leador.mapapi.tracker.exception.TrackerException;
-import cn.com.leador.mapapi.tracker.exception.TrackerExceptionEnum;
+import java.util.Date;
 
 public class Test {
 
@@ -48,8 +46,36 @@ public class Test {
 //		
 //		System.out.println(((Document)iterable.first().get("obj")).get("createTime"));
 //		mongoClient.close();
-		BusinessException exception=new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
-		throw exception;
+//		BusinessException exception=new TrackerException(TrackerExceptionEnum.REDIS_EXCEPTION);
+//		throw exception;
+//		Object[] a=new Object[3];
+//		a[0]=new Double[]{1D,2D};
+//		a[1]=new Double[]{2D,3D};
+//		a[2]=new Double[]{3D,4D};
+//		Object[] b=new Object[]{a};
+//		Map<String,Object> map=new HashMap<String,Object>();
+//		map.put("coords", b);
+//		JsonBinder binder=JsonBinder.buildNonNullBinder(false);
+//		String json=binder.toJson(map);
+//		System.out.println(json);
+		
+		
+//		List<List<Double[]>> _list=new ArrayList<List<Double[]>>();
+//		List<Double[]> _l=new ArrayList<Double[]>();
+//		_l.add(new Double[]{1D,2D});
+//		_l.add(new Double[]{1D,2D});
+//		_l.add(new Double[]{1D,2D});
+//		_list.add(_l);
+//		Map<String,Object> map=new HashMap<String,Object>();
+//		map.put("coords",_list);
+//		JsonBinder binder=JsonBinder.buildNonNullBinder(false);
+//		String json=binder.toJson(map);
+//		System.out.println(json);
+		
+//		String s="0830";
+//		System.out.println(Integer.valueOf(s));
+		
+		System.out.println(new Date().getTime()/1000);
 	}
 
 }

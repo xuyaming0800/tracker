@@ -1,6 +1,7 @@
 package cn.com.leador.mapapi.tracker.component;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,13 +20,22 @@ import cn.com.leador.mapapi.common.exception.BusinessException;
 import cn.com.leador.mapapi.common.exception.BusinessExceptionEnum;
 import cn.com.leador.mapapi.common.util.json.JsonBinder;
 import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant;
+import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.FENCE_ALARM_CONDITION_TYPE;
+import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.FENCE_CYCLE_TYPE;
+import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.FENCE_ENTITY_STATUS;
+import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.FENCE_SHAPE_TYPE;
 import cn.com.leador.mapapi.tracker.constants.TrackerEnumConstant.TRACK_GPS_TYPE;
 import cn.com.leador.mapapi.tracker.entity.bean.EntityBean;
 import cn.com.leador.mapapi.tracker.entity.bean.EntityLocationBean;
 import cn.com.leador.mapapi.tracker.exception.TrackerException;
 import cn.com.leador.mapapi.tracker.exception.TrackerExceptionEnum;
+import cn.com.leador.mapapi.tracker.fence.bean.FenceAlarmBean;
+import cn.com.leador.mapapi.tracker.fence.bean.FenceBean;
+import cn.com.leador.mapapi.tracker.fence.bean.FenceEntityBean;
+import cn.com.leador.mapapi.tracker.fence.bean.FencePointBean;
 import cn.com.leador.mapapi.tracker.track.bean.TrackBean;
 import cn.com.leador.mapapi.tracker.track.bean.TrackColumnBean;
+import cn.com.leador.mapapi.tracker.util.DateUtil;
 import cn.com.leador.mapapi.tracker.util.mq.RabbitMQMessageHandler;
 import cn.com.leador.mapapi.tracker.util.mq.RabbitMQUtils;
 
@@ -107,7 +117,8 @@ public class TrackerProceedComponent {
 		return handler;
 	}
 
-	public final TrackBean addPoint(TrackBean bean) throws BusinessException {
+	@SuppressWarnings("serial")
+	public final TrackBean addPoint(final TrackBean bean) throws BusinessException {
 		try {
 			JsonBinder binder = JsonBinder.buildNonNullBinder(false);
 			// 处理坐标转换
@@ -326,6 +337,160 @@ public class TrackerProceedComponent {
 			}
 			mongoDBUtilComponent
 					.insertObject("track_info", binder.toJson(bean));
+			//检测是否需要围栏判断
+			Date date=new Date(bean.getLoc_time()*1000);
+			final String dateStr=DateUtil.parseString(date, "yyyyMMdd");
+			final String timeStr=DateUtil.parseString(date, "Hmm");
+			final Integer day=DateUtil.getDay(date);
+			queryMap.clear();
+			queryMap.put("service_id", bean.getService_id());
+			queryMap.put("valid_times", new HashMap<String, Object>() {
+				{
+					put("$elemMatch", new HashMap<String, Object>() {
+						{
+							put("start",new HashMap<String, Object>() {
+								{
+									put("$lte",Integer.valueOf(timeStr) );
+								}
+							});
+							put("end", new HashMap<String, Object>() {
+								{
+									put("$gte",Integer.valueOf(timeStr) );
+								}
+							});
+						}
+					});
+				}
+			});
+			queryMap.put("monitored_persons",
+					new HashMap<String, Object>() {
+						{
+							put("$all", new String[] { bean.getEntity_name() });
+						}
+					});
+			System.out.println(binder.toJson(queryMap));
+			List<FenceBean> fenceBeanList=mongoDBUtilComponent.selectObjectMultiProjection("fence_info", queryMap, null, false, FenceBean.class, null);
+			List<FenceBean> _fenceBeanList=new ArrayList<FenceBean>();
+			if(fenceBeanList!=null&&fenceBeanList.size()>0){
+				//前置判断围栏是否生效
+				
+				for(FenceBean fenceBean:fenceBeanList){
+					if(fenceBean.getValid_cycle().intValue()==FENCE_CYCLE_TYPE.NO_REPEAT.getType()){
+						if(fenceBean.getValid_date().equals(dateStr)){
+							_fenceBeanList.add(fenceBean);
+						}
+					}else if(fenceBean.getValid_cycle().intValue()==FENCE_CYCLE_TYPE.WORKDAY.getType()){
+						if(day-1>=1&&day-1<=5){
+							_fenceBeanList.add(fenceBean);
+						}
+					}else if(fenceBean.getValid_cycle().intValue()==FENCE_CYCLE_TYPE.WEEKEND.getType()){
+						if(day==1&&day==1){
+							_fenceBeanList.add(fenceBean);
+						}
+					}else if(fenceBean.getValid_cycle().intValue()==FENCE_CYCLE_TYPE.EVERYDAY.getType()){
+						_fenceBeanList.add(fenceBean);
+					}else{
+						if(fenceBean.getValid_days().contains(day)){
+							_fenceBeanList.add(fenceBean);
+						}
+					}
+					
+				}
+				if(_fenceBeanList.size()>0){
+					//更新点位置
+					queryMap.clear();
+					queryMap.put("service_id", bean.getService_id());
+					queryMap.put("entity_name", bean.getEntity_name());
+					FencePointBean point=new FencePointBean();
+					point.getCoordinates()[0]=bean.getLongitude();
+					point.getCoordinates()[1]=bean.getLatitude();
+					FenceEntityBean entityBean=new FenceEntityBean();
+					entityBean.setService_id(bean.getService_id());
+					entityBean.setEntity_name(bean.getEntity_name());
+					entityBean.setLoc(point);
+					entityBean.setLoc_time(bean.getLoc_time());
+					entityBean.setModify_time(bean.getModify_time());
+					entityBean.setModify_timestamp(bean.getCreate_timestamp());
+					mongoDBUtilComponent.upsertCommonObject("fence_entity_info", queryMap, binder.toJson(entityBean));
+				}
+				
+				for(FenceBean fenceBean:_fenceBeanList){
+					queryMap.clear();
+					queryMap.put("service_id", bean.getService_id());
+					queryMap.put("entity_name", bean.getEntity_name());
+					//查询点是否在围栏里面
+					if(fenceBean.getShape().intValue()==FENCE_SHAPE_TYPE.CYCLE.getType()){
+						final List<Object> centerSphere=fenceBean.getCenterSphere();
+						queryMap.put("loc",new HashMap<String, Object>() {
+							{
+								put("$geoWithin", new HashMap<String, Object>() {
+									{
+										put("$centerSphere", centerSphere);
+									}
+								});
+							}
+						});
+					}else{
+						final List<List<Double[]>> coords=fenceBean.getCoords();
+						queryMap.put("loc",new HashMap<String, Object>() {
+							{
+								put("$geoWithin", new HashMap<String, Object>() {
+									{
+										put("$geometry", new HashMap<String, Object>() {
+											{
+												put("type", "Polygon");
+												put("coordinates", coords);
+											}
+										});
+									}
+								});
+							}
+						});
+					}
+					int count=mongoDBUtilComponent.countObject("fence_entity_info", queryMap);
+					queryMap.clear();
+					queryMap.put("fence_id", fenceBean.getFence_id());
+					Map<String, Object> updateMap = new HashMap<String, Object>();
+					if(count==1){
+						updateMap.put("$set", new HashMap<String, Object>() {
+							{
+								put("monitored_type."+bean.getEntity_name(), FENCE_ENTITY_STATUS.IN.getStatus());
+							}
+						});
+					}else{
+						updateMap.put("$set", new HashMap<String, Object>() {
+							{
+								put("monitored_type."+bean.getEntity_name(), FENCE_ENTITY_STATUS.OUT.getStatus());
+							}
+						});
+					}
+					mongoDBUtilComponent.executeUpdate("fence_info", queryMap, updateMap);
+					FenceAlarmBean fenceAlarmBean=new FenceAlarmBean(bean.getAk(),bean.getService_id(),
+							bean.getEntity_name(),bean.getCreate_time(),bean.getCreate_timestamp(),bean.getLoc_time());
+					if(fenceBean.getAlarm_condition().intValue()==FENCE_ALARM_CONDITION_TYPE.ENTRY.getType()){
+						if(count==1){
+							fenceAlarmBean.setAction(FENCE_ENTITY_STATUS.IN.getStatus());
+						}
+					}else if(fenceBean.getAlarm_condition().intValue()==FENCE_ALARM_CONDITION_TYPE.EXIT.getType()){
+						if(count==0){
+							fenceAlarmBean.setAction(FENCE_ENTITY_STATUS.OUT.getStatus());
+						}
+					}else{
+						if(count==1){
+							fenceAlarmBean.setAction(FENCE_ENTITY_STATUS.IN.getStatus());
+						}else{
+							fenceAlarmBean.setAction(FENCE_ENTITY_STATUS.OUT.getStatus());
+						}
+					}
+					if(fenceAlarmBean.getAction()!=null){
+						//存在需要报警 存储报警
+						fenceAlarmBean.setFence_id(fenceBean.getFence_id());
+						mongoDBUtilComponent.insertObject("fence_alarm_info", binder.toJson(fenceAlarmBean));
+						//报警信息推送 暂未实现
+					}
+				}
+			}
+			
 			return bean;
 		} catch (Exception e) {
 			if (e instanceof BusinessException) {

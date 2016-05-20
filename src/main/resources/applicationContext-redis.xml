@@ -12,7 +12,7 @@ http://www.springframework.org/schema/beans/spring-beans-4.0.xsd">
 	</bean>
 	<bean id="jedisPool" class="redis.clients.jedis.JedisPool">
 		<constructor-arg ref="jedisPoolConfig" />
-		<constructor-arg value="${redis.host}" />
+		<constructor-arg type="java.lang.String" value="${redis.host}" />
 		<constructor-arg type="int" value="${redis.port}" />
 		<constructor-arg type="int" value="${redis.timeout}" />
 <!-- 		<constructor-arg value="aA111111" /> -->

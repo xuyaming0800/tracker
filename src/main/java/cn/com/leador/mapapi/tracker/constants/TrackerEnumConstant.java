@@ -78,6 +78,58 @@ public class TrackerEnumConstant {
 			this.type = type;
 		}
 	}
+	
+	public enum FENCE_CYCLE_TYPE{
+		NO_REPEAT(1),WORKDAY(2),WEEKEND(3),EVERYDAY(4),CUSTOMER(5);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private FENCE_CYCLE_TYPE(int type) {
+			this.type = type;
+		}
+	}
+	
+	public enum FENCE_ENTITY_STATUS{
+		NO_STATUS(0),IN(1),OUT(2);
+		private int status;
+
+		public int getStatus() {
+			return status;
+		}
+
+		private FENCE_ENTITY_STATUS(int status) {
+			this.status = status;
+		}
+	}
+	
+	public enum FENCE_ALARM_CONDITION_TYPE{
+		ENTRY(1),EXIT(2),ALL(3);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private FENCE_ALARM_CONDITION_TYPE(int type) {
+			this.type = type;
+		}
+	}
+	
+	public enum FENCE_SHAPE_TYPE{
+		CYCLE(1),POLYGON(2);
+		private int type;
+
+		public int getType() {
+			return type;
+		}
+
+		private FENCE_SHAPE_TYPE(int type) {
+			this.type = type;
+		}
+	}
 
 	public enum TRACKER_SERVICE_TYPE {
 		// CAR 车辆管理行业 MTK MTK位置穿戴 O2O O2O配送行业 OTHER 其他

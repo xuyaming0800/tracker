@@ -10,9 +10,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public final class DateUtil {
-	private static Logger log =LogManager.getLogger(DateUtil.class);
-	
-    public static final String  SIMPLE_DATE_FORT = "yyyy-MM-dd HH:mm:ss";
+	private static Logger log = LogManager.getLogger(DateUtil.class);
+
+	public static final String SIMPLE_DATE_FORT = "yyyy-MM-dd HH:mm:ss";
 	public static final String DEFAULT_DATE_PATTERN = "yyyy-MM-dd";
 	public static final SimpleDateFormat SDF = new SimpleDateFormat(
 			DEFAULT_DATE_PATTERN);
@@ -38,7 +38,7 @@ public final class DateUtil {
 		}
 		return returnValue;
 	}
-	
+
 	public static Date parse(String date, String format) {
 		if (isBlank(date))
 			return null;
@@ -54,25 +54,29 @@ public final class DateUtil {
 			return null;
 		}
 	}
-	
+
 	public static boolean isNotBlank(String s) {
 		return !isBlank(s);
 	}
-	public static String getYesterDayEndStr(){
-		Calendar cal= Calendar.getInstance();
+
+	public static String getYesterDayEndStr() {
+		Calendar cal = Calendar.getInstance();
 		cal.setTime(new Date());
 		cal.add(Calendar.DATE, -1);
 		Date yesterDay = cal.getTime();
-		String end = getCustomFormatDate(yesterDay.getTime(), "yyyy-MM-dd") + " 23:59:59";	
-		return end;	
+		String end = getCustomFormatDate(yesterDay.getTime(), "yyyy-MM-dd")
+				+ " 23:59:59";
+		return end;
 	}
-	public static String getCustomFormatDate(long time, String formatStyle){
+
+	public static String getCustomFormatDate(long time, String formatStyle) {
 		Date cup = new Date();
 		cup.setTime(time);
 		SimpleDateFormat sdf = new SimpleDateFormat(formatStyle);
 		String strDate = sdf.format(cup);
 		return strDate;
 	}
+
 	public static final Date convertStringToDate(String aMask, String strDate)
 			throws ParseException {
 		SimpleDateFormat df = null;
@@ -93,7 +97,7 @@ public final class DateUtil {
 
 		return (date);
 	}
-	
+
 	public static String getCurrentDateTime() {
 
 		return parseString(new Date(), SIMPLE_DATE_FORT);
@@ -103,8 +107,8 @@ public final class DateUtil {
 		return parseString(new Date(), DEFAULT_DATE_PATTERN);
 	}
 
-	public static String rollDateByStr(String dateString,
-			String dateFormat, int rollDay) {
+	public static String rollDateByStr(String dateString, String dateFormat,
+			int rollDay) {
 
 		if (StringUtils.isBlank(dateFormat)) {
 			dateFormat = DEFAULT_DATE_PATTERN;
@@ -124,7 +128,13 @@ public final class DateUtil {
 		}
 		return null;
 	}
-	
+
+	public static int getDay(Date date) {
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(date);
+		return cal.get(Calendar.DAY_OF_WEEK);
+	}
+
 	public static void main(String[] args) {
 
 		// System.out.println(rollDateByStr("2014-01-06 10:23:11",
@@ -132,9 +142,11 @@ public final class DateUtil {
 		//
 		// System.out.println(parseString(new Date(), SIMPLE_DATE_FORT));
 
-		System.out.println(getCurrentDate());
-
-		System.out.println(getCurrentDateTime());
+//		System.out.println(getCurrentDate());
+//
+//		System.out.println(getCurrentDateTime());
+		
+		System.out.println(getDay(new Date()));
 
 	}
 

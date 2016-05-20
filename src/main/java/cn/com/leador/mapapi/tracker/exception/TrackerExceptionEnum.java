@@ -32,6 +32,11 @@ public enum TrackerExceptionEnum {
 	REDIS_ENTITY_COLUMN_NOT_FOUND("t_1024","自定义检索字段不存在"),
 	REDIS_ENTITY_NAME_NOT_FOUND("t_1025","实体名称不存在"),
 	
+	FENCE_ENTITY_COUNT_IS_MAX("t_1026","围栏中实体数量过多"),
+	FENCE_PER_ENTITY_COUNT_IS_MAX("t_1027","实体对应的围栏过多"),
+	FENCE_ENTITY_IS_ADD_NOW("t_1028","实体正在被加入围栏，相同实体请不要并发加入围栏"),
+	FENCE_IS_NOT_FOUND("t_1029","地址围栏未找到"),
+	
 	;
 	private String code;
 	private String message;

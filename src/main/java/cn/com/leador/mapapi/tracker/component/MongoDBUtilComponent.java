@@ -638,6 +638,44 @@ public class MongoDBUtilComponent {
 					TrackerExceptionEnum.MONGONDB_UPDATE_ERROR);
 		}
 	}
+	@SuppressWarnings("unchecked")
+	public void upsertCommonObject(String tableName,
+			Map<String, Object> updateQueryMap, String updatejson) throws BusinessException {
+
+		try {
+			JsonBinder binder = JsonBinder.buildNormalBinder(false);
+			String queryJson = binder.toJson(updateQueryMap);
+			
+			Integer style = this.verifyJsonStyle(updatejson);
+			Map<String, Object> updateMap = null;
+			if (style.equals(JSON_STYLE.MAP.getCode())) {
+				updateMap = binder.fromJson(updatejson, Map.class, binder
+						.getCollectionType(Map.class, String.class,
+								Object.class));
+			} else if (style.equals(JSON_STYLE.ARRAY.getCode())) {
+				logger.error("插入时候的JSON串必须是JSON格式");
+				throw new TrackerException(
+						TrackerExceptionEnum.MONGONDB_INSERT_ERROR);
+			}
+			
+			DBCollection dbcoll = mongoTemplate.getDb()
+					.getCollection(tableName);
+			BasicDBObject updateQuery = new BasicDBObject();
+			updateQuery.putAll(updateQueryMap);
+			BasicDBObject update = new BasicDBObject();
+			update.putAll(updateMap);
+			dbcoll.update(updateQuery, new BasicDBObject("$set", update), true,
+					false);
+
+			// 记录日志 供万一写数据失败 追回使用
+			logger.info("[UPDATE_QUERY] " + queryJson + " [UPDATE_LOCATE] "
+					+ "" + " [UPDATE] " + updatejson);
+		} catch (Exception e) {
+			logger.error(e.getMessage(), e);
+			throw new TrackerException(
+					TrackerExceptionEnum.MONGONDB_UPDATE_ERROR);
+		}
+	}
 
 	public void updateCommonObject(String tableName,
 			Map<String, Object> updateQueryMap, String updatelocate,
@@ -686,6 +724,50 @@ public class MongoDBUtilComponent {
 			for (String key : updateMap.keySet()) {
 				String updatejson = "";
 				JsonBinder binder = JsonBinder.buildNormalBinder(false);
+				updatejson = binder.toJson(updateMap.get(key));
+				String queryJson = binder.toJson(updateQueryMap);
+				logger.info("[UPDATE_QUERY] " + queryJson + " [UPDATE_LOCATE] "
+						+ key + " [UPDATE] " + updatejson);
+			}
+
+		} catch (Exception e) {
+			logger.error(e.getMessage(), e);
+			throw new TrackerException(
+					TrackerExceptionEnum.MONGONDB_UPDATE_ERROR);
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public void executeUpdate(String tableName,
+			Map<String, Object> updateQueryMap, String json)
+			throws BusinessException {
+		try {
+			JsonBinder binder = JsonBinder.buildNormalBinder(false);
+			Integer style = this.verifyJsonStyle(json);
+			Map<String, Object> updateMap = null;
+			if (style.equals(JSON_STYLE.MAP.getCode())) {
+				updateMap = binder.fromJson(json, Map.class, binder
+						.getCollectionType(Map.class, String.class,
+								Object.class));
+			} else if (style.equals(JSON_STYLE.ARRAY.getCode())) {
+				logger.error("插入时候的JSON串必须是JSON格式");
+				throw new TrackerException(
+						TrackerExceptionEnum.MONGONDB_INSERT_ERROR);
+			}
+			
+			DBCollection dbcoll = mongoTemplate.getDb()
+					.getCollection(tableName);
+			BasicDBObject updateQuery = new BasicDBObject();
+			updateQuery.putAll(updateQueryMap);
+			BasicDBObject update = new BasicDBObject();
+
+			// JSON形式 直接set
+			update.putAll(updateMap);
+			dbcoll.update(updateQuery, update);
+
+			// 记录日志 供万一写数据失败 追回使用
+			for (String key : updateMap.keySet()) {
+				String updatejson = "";
 				updatejson = binder.toJson(updateMap.get(key));
 				String queryJson = binder.toJson(updateQueryMap);
 				logger.info("[UPDATE_QUERY] " + queryJson + " [UPDATE_LOCATE] "
