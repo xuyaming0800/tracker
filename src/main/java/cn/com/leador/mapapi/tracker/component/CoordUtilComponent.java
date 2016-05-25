@@ -106,5 +106,10 @@ public class CoordUtilComponent {
 		BigDecimal b = new BigDecimal(speed);
 		return b.setScale(5, BigDecimal.ROUND_HALF_UP).doubleValue();
 	}
+	
+	public static void main(String[] argu){
+		CoordUtilComponent a=new CoordUtilComponent();
+		System.out.println(a.getDirection(116.43149900000024, 39.899993, 116.43099900000024, 39.899993));
+	}
 
 }

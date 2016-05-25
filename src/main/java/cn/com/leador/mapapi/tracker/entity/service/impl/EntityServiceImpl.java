@@ -120,7 +120,7 @@ public class EntityServiceImpl implements EntityService<EntityBean, EntityBean> 
 			bean.setCreate_time(date);
 			bean.setModify_time(date);
 			EntityLocationBean realPoint = new EntityLocationBean();
-			realPoint.setLoc_time(date.getTime() / 1000);
+			realPoint.setLoc_time(0L);
 			realPoint.setSpeed(null);
 			realPoint.setDirection(null);
 			bean.setRealtime_point(realPoint);

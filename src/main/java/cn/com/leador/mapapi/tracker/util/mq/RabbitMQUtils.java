@@ -345,7 +345,7 @@ public class RabbitMQUtils {
 			connection = factory.newConnection();
 			channel = connection.createChannel();
 			//设置初始化路由
-			channel.exchangeDeclare(exchange, "direct");
+			channel.exchangeDeclare(exchange, "direct",true,false,false,null);
 			// channel.basicQos(1);// 实现公平调度的方式就是让每个消费者在同一时刻会分配一个任务。
 			// boolean durable = true;
 			channel.queueDeclare(queueName+"_"+routeKey, true, false, false, null);

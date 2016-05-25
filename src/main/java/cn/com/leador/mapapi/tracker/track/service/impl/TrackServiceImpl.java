@@ -7,6 +7,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +54,23 @@ public class TrackServiceImpl implements TrackService<TrackBean, TrackBean> {
 	private String mq_tracker_exchange;
 	@Value("${mq.consumer_count}")
 	private Integer consumerCount;
+	
+	@Value("${mq.username}")
+	private String userName;
+	@Value("${mq.password}")
+	private String password;
+	
+	
+	@PostConstruct
+	private void init() throws BusinessException {
+		if(userName!=null&&userName.equals("")){
+			userName=null;
+		}
+		if(password!=null&&password.equals("")){
+			password=null;
+		}
+
+	}
 
 	@Override
 	public ResultBean<TrackBean> addPoint(TrackBean bean)
@@ -152,8 +171,8 @@ public class TrackServiceImpl implements TrackService<TrackBean, TrackBean> {
 			Long id = new Long(mq_tracker_exchange.hashCode());
 			String routeKey = String.valueOf(bean.getEntity_name().hashCode()
 					% consumerCount);
-			RabbitMQUtils.sendToQueue(String.valueOf(id), mqHost, mqPort, null,
-					null, mq_tracker_exchange, routeKey, bean, false);
+			RabbitMQUtils.sendToQueue(String.valueOf(id), mqHost, mqPort, userName,
+					password, mq_tracker_exchange, routeKey, bean, false);
 			ResultBean<TrackBean> result = new ResultBean<TrackBean>();
 			result.setSuccessful(true);
 			result.setResult(bean);

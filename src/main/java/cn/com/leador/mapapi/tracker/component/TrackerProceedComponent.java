@@ -61,12 +61,23 @@ public class TrackerProceedComponent {
 	private Integer entityMax;
 	@Value("${coords.min_distance}")
 	private Double minDistance;
+	
+	@Value("${mq.username}")
+	private String userName;
+	@Value("${mq.password}")
+	private String password;
 
 	@PostConstruct
 	private void init() throws BusinessException {
+		if(userName!=null&&userName.equals("")){
+			userName=null;
+		}
+		if(password!=null&&password.equals("")){
+			password=null;
+		}
 		logger.info("启动轨迹上传消息队列处理消费者");
 		for (int i = 0; i < consumerCount; i++) {
-			this.receiveCollectInfoToAuditQueue(executeTrack(),
+			this.receiveCollectInfoToAuditQueue(executeTrack(String.valueOf(i)),
 					String.valueOf(i));
 		}
 
@@ -81,7 +92,7 @@ public class TrackerProceedComponent {
 				public void run() {
 					try {
 						RabbitMQUtils.receive(String.valueOf(id), host, port,
-								null, null, queueName, exchange, index,
+								userName, password, queueName, exchange, index,
 								TrackBean.class, false, handler);
 					} catch (Exception e) {
 						logger.error(e.getMessage(), e);
@@ -98,13 +109,14 @@ public class TrackerProceedComponent {
 		}
 	}
 
-	private RabbitMQMessageHandler executeTrack() {
+	private RabbitMQMessageHandler executeTrack(final String index) {
 		RabbitMQMessageHandler handler = new RabbitMQMessageHandler() {
 
 			@Override
 			public void setMessage(Object message) {
 				try {
 					TrackBean bean = (TrackBean) message;
+					logger.info("处理队列"+index);
 					addPoint(bean);
 
 				} catch (Exception e) {
@@ -159,11 +171,13 @@ public class TrackerProceedComponent {
 					.selectObjectMultiProjection("entity_info", queryMap,
 							new String[] { "realtime_point" }, false,
 							EntityBean.class, null);
+			logger.info("查询到的实体列表大小:"+entitylist.size());
 			if (entitylist != null && entitylist.size() > 0) {
 				// 存在情况，更新信息
 				EntityBean _bean = entitylist.get(0);
 				if (bean.getLoc_time() >= _bean.getRealtime_point()
 						.getLoc_time()) {
+					logger.info("往后更新实时位置:"+bean.getLoc_time());
 					// 时间大于上一次才更新实时位置
 					EntityLocationBean locate = _bean.getRealtime_point();
 					Map<String, Object> updateMap = new HashMap<String, Object>();
@@ -282,12 +296,40 @@ public class TrackerProceedComponent {
 					}
 
 				}
-				if (bean.getDistance() != null
-						&& bean.getDistance() < minDistance) {
-					bean.setIs_pumping(true);
-				} else {
+				//计算是否是需要抽希 
+				Map<String, Object> sort = new HashMap<String, Object>();
+				sort.put("loc_time", -1);
+				Map<String, Object> _map = new HashMap<String, Object>();
+				_map.put("$lte", bean.getLoc_time());
+				queryMap.put("loc_time", _map);
+				queryMap.put("is_pumping", false);
+				// 查询上一个降噪后存留的点
+				List<TrackBean> _list = mongoDBUtilComponent
+						.selectObjectMultiProjection("track_info",
+								queryMap, new String[] { "longitude",
+										"latitude", "loc_time" }, false,
+								TrackBean.class, null, 1, 1, sort);
+				if (_list != null && _list.size() > 0) {
+					TrackBean __bean = _list.get(0);
+					Double distance=coordUtilComponent.getDistance(
+							__bean.getLongitude(), __bean.getLatitude(),
+							bean.getLongitude(), bean.getLatitude());
+					if(distance!=null&&distance < minDistance){
+						bean.setIs_pumping(true);
+					}else{
+						bean.setIs_pumping(false);
+					}
+					
+				}else{
 					bean.setIs_pumping(false);
 				}
+				
+//				if (bean.getDistance() != null
+//						&& bean.getDistance() < minDistance) {
+//					bean.setIs_pumping(true);
+//				} else {
+//					bean.setIs_pumping(false);
+//				}
 
 			} else {
 				// 不存在 默认插入一个
