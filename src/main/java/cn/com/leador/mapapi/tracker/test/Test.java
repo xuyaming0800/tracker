@@ -1,6 +1,6 @@
 package cn.com.leador.mapapi.tracker.test;
 
-import java.util.Date;
+import java.text.DecimalFormat;
 
 public class Test {
 
@@ -75,7 +75,13 @@ public class Test {
 //		String s="0830";
 //		System.out.println(Integer.valueOf(s));
 		
-		System.out.println(new Date().getTime()/1000);
+//		System.out.println(new Date().getTime()/1000);
+		
+
+        DecimalFormat   df   =new  DecimalFormat("#.000000");  
+        String s=df.format(116.1234D);
+        System.out.println(Double.valueOf(s));
+
 	}
 
 }

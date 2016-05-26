@@ -1,5 +1,6 @@
 package cn.com.leador.mapapi.tracker.track.input;
 
+import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,6 +41,7 @@ public class TrackAddInput extends CommonInputProxy<TrackBean> {
 		Map<String, String> map = clientInfo.getInfoTable();
 		TrackBean bean = new TrackBean();
 		bean.setCustom_field(new HashMap<String,Object>());
+		DecimalFormat   df   =new  DecimalFormat("#.000000");
 		for(String key:clientInfo.getOrginParamNames()){
 			if(key.equals("ak")){
 				bean.setAk(map.get(key));
@@ -48,9 +50,9 @@ public class TrackAddInput extends CommonInputProxy<TrackBean> {
 			}else if(key.equals("entity_name")){
 				bean.setEntity_name(map.get(key));
 			}else if(key.equals("longitude")){
-				bean.setLongitude(Double.valueOf((map.get(key))));
+				bean.setLongitude(Double.valueOf(df.format(Double.valueOf((map.get(key))))));
 			}else if(key.equals("latitude")){
-				bean.setLatitude(Double.valueOf((map.get(key))));
+				bean.setLatitude(Double.valueOf(df.format(Double.valueOf((map.get(key))))));
 			}else if(key.equals("coord_type")){
 				bean.setCoord_type(Integer.valueOf((map.get(key))));
 			}else if(key.equals("loc_time")){
